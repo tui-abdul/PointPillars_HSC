@@ -26,6 +26,17 @@ struct PillarPoint {
     float xc;
     float yc;
     float zc;
+
+    int size_pp(){
+        return 7;
+    }
+};
+
+
+int some_thing(int a){
+
+
+    return a;
 };
 
 pybind11::tuple createPillars(pybind11::array_t<float> points,
@@ -41,6 +52,8 @@ pybind11::tuple createPillars(pybind11::array_t<float> points,
                               float zMax,
                               bool printTime = false)
 {
+   
+    
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
     if (points.ndim() != 2 || points.shape()[1] != 4)
@@ -48,10 +61,13 @@ pybind11::tuple createPillars(pybind11::array_t<float> points,
         throw std::runtime_error("numpy array with shape (n, 4) expected (n being the number of points)");
     }
 
-    std::unordered_map<std::pair<uint32_t, uint32_t>, std::vector<PillarPoint>, IntPairHash> map;
-
+    std::unordered_map<std::pair<uint32_t, uint32_t>, std::vector<PillarPoint>, IntPairHash> map; // study
+    //std::cout << "points shape  " << points.shape()[1] << std::endl;
     for (int i = 0; i < points.shape()[0]; ++i)
     {
+
+        
+
         if ((points.at(i, 0) < xMin) || (points.at(i, 0) >= xMax) || \
             (points.at(i, 1) < yMin) || (points.at(i, 1) >= yMax) || \
             (points.at(i, 2) < zMin) || (points.at(i, 2) >= zMax))
@@ -59,31 +75,38 @@ pybind11::tuple createPillars(pybind11::array_t<float> points,
             continue;
         }
 
-        auto xIndex = static_cast<uint32_t>(std::floor((points.at(i, 0) - xMin) / xStep));
-        auto yIndex = static_cast<uint32_t>(std::floor((points.at(i, 1) - yMin) / yStep));
+        auto xIndex = static_cast<uint32_t>(std::floor((points.at(i, 0) - xMin) / xStep)); // binning the data into grids, index represents the points in the bin
+        auto yIndex = static_cast<uint32_t>(std::floor((points.at(i, 1) - yMin) / yStep)); // binning the data into grids, index represents the points in the bin
 
         PillarPoint p = {
-            points.at(i, 0),
-            points.at(i, 1),
-            points.at(i, 2),
-            points.at(i, 3),
-            0,
-            0,
-            0,
+            points.at(i, 0),    //x
+            points.at(i, 1),    //y    
+            points.at(i, 2),    //z
+            points.at(i, 3),    //intensity
+            0,                  //xc distance from the center of pillar
+            0,                  //yc
+            0,                  //zc    
         };
-
+        
         map[{xIndex, yIndex}].emplace_back(p);
     }
-
+    
     pybind11::array_t<float> tensor;
     pybind11::array_t<int> indices;
 
     tensor.resize({1, maxPillars, maxPointsPerPillar, 7});
     indices.resize({1, maxPillars, 3});
-
+    
     int pillarId = 0;
     for (auto& pair: map)
     {
+       
+        //std::cout << "pair second size  "<< pair.second.size() << std::endl;
+        //for (auto y: pair.second){
+        //std::cout << " ppppp  " << y.size_pp() << std::endl;
+        //    }
+        
+        
         if (pillarId >= maxPillars)
         {
             break;
@@ -94,6 +117,7 @@ pybind11::tuple createPillars(pybind11::array_t<float> points,
         float zMean = 0;
         for (const auto& p: pair.second)
         {
+            
             xMean += p.x;
             yMean += p.y;
             zMean += p.z;
@@ -109,11 +133,12 @@ pybind11::tuple createPillars(pybind11::array_t<float> points,
             p.zc = p.z - zMean;
         }
 
-        auto xIndex = static_cast<int>(std::floor((xMean - xMin) / xStep));
-        auto yIndex = static_cast<int>(std::floor((yMean - yMin) / yStep));
+        auto xIndex = static_cast<int>(std::floor((xMean - xMin) / xStep));  //finding position of bins 
+        auto yIndex = static_cast<int>(std::floor((yMean - yMin) / yStep));  //finding position cell
         auto zMid   = (zMax - zMin) * 0.5f;
         indices.mutable_at(0, pillarId, 1) = xIndex;
         indices.mutable_at(0, pillarId, 2) = yIndex;
+        //std::cout << " xxxx " << xIndex << "," << yIndex << std::endl;
 
         int pointId = 0;
         for (const auto& p: pair.second)
@@ -130,7 +155,8 @@ pybind11::tuple createPillars(pybind11::array_t<float> points,
             tensor.mutable_at(0, pillarId, pointId, 4) = p.xc;
             tensor.mutable_at(0, pillarId, pointId, 5) = p.yc;
             tensor.mutable_at(0, pillarId, pointId, 6) = p.zc;
-
+            //std::cout << " pillar id " << pillarId << " point id " << pointId << " x " << p.x << " y " << p.y << " z " << 
+            //    p.z << " intensity " << p.intensity << std::endl;
             pointId++;
         }
 
@@ -356,9 +382,9 @@ std::tuple<pybind11::array_t<float>, int, int> createPillarsTarget(const pybind1
     
     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
-    const auto xSize = static_cast<int>(std::floor((xMax - xMin) / (xStep * downscalingFactor)));
+    const auto xSize = static_cast<int>(std::floor((xMax - xMin) / (xStep * downscalingFactor))); // grid size
 //     py::print("xSize", xSize);
-    const auto ySize = static_cast<int>(std::floor((yMax - yMin) / (yStep * downscalingFactor)));
+    const auto ySize = static_cast<int>(std::floor((yMax - yMin) / (yStep * downscalingFactor))); // grid size
 //     py::print("ySize", ySize);
 
     const int nbAnchors = anchorDimensions.shape()[0]; //4 Number of anchors
@@ -371,6 +397,7 @@ std::tuple<pybind11::array_t<float>, int, int> createPillarsTarget(const pybind1
     }
 
     const int nbObjects = objectDimensions.shape()[0]; //6 Number of labels inside a label.txt file
+    std::cout << "number of objects  " << nbObjects << std::endl;
 //     BB dimensions from the label file
     if (nbObjects <= 0)
     {
@@ -394,7 +421,7 @@ std::tuple<pybind11::array_t<float>, int, int> createPillarsTarget(const pybind1
         anchorBox.yaw = anchorYaws.at(i);
         anchorBoxes.emplace_back(anchorBox); // Appends a new anchorBox to the AnchorBoxes container
         // Note that anchor box doesn't have a classId as of now.
-        anchorDiagonals.emplace_back(std::sqrt(std::pow(anchorBox.width, 2) + std::pow(anchorBox.length, 2)));
+        anchorDiagonals.emplace_back(std::sqrt(std::pow(anchorBox.width, 2) + std::pow(anchorBox.length, 2))); // sqrt(a^2 + b^2)
     }
 
 //     Preparing the label bounding box
@@ -542,7 +569,7 @@ std::tuple<pybind11::array_t<float>, int, int> createPillarsTarget(const pybind1
             }
 
             const auto xId = static_cast<int>(std::floor((labelBox.x - xMin) / (xStep * downscalingFactor)));
-            const auto yId = static_cast<int>(std::floor((labelBox.y - yMin) / (yStep * downscalingFactor)));
+            const auto yId = static_cast<int>(std::floor((labelBox.y - yMin) / (yStep * downscalingFactor)));list_iterator
             const float diag = std::sqrt(std::pow(bestAnchor.width, 2) + std::pow(bestAnchor.length, 2));
 
             tensor.mutable_at(objectCount, xId, yId, bestAnchorId, 0) = 1;
@@ -593,4 +620,5 @@ PYBIND11_MODULE(point_pillars, m)
 {
     m.def("createPillars", &createPillars, "Runs function to create point pillars input tensors");
     m.def("createPillarsTarget", &createPillarsTarget, "Runs function to create point pillars output ground truth");
+    m.def("some_thing", &some_thing, "a function test");
 }

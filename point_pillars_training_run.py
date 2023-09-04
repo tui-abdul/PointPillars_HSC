@@ -12,7 +12,8 @@ from readers import KittiDataReader
 
 tf.get_logger().setLevel("ERROR")
 
-DATA_ROOT = "../training"  # TODO make main arg
+#DATA_ROOT = "../training"  # TODO make main arg
+DATA_ROOT =  '../../../kitti/training/'
 MODEL_ROOT = "./logs"
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
@@ -23,14 +24,14 @@ if __name__ == "__main__":
     params = Parameters()
 
     pillar_net = build_point_pillar_graph(params)
-    pillar_net.load_weights(os.path.join(MODEL_ROOT, "model.h5"))
+    #pillar_net.load_weights(os.path.join(MODEL_ROOT, "model.h5"))
 
-    loss = PointPillarNetworkLoss(params)
+    #loss = PointPillarNetworkLoss(params)
 
-    optimizer = tf.keras.optimizers.Adam(lr=params.learning_rate, decay=params.decay_rate)
+    #optimizer = tf.keras.optimizers.Adam(lr=params.learning_rate, decay=params.decay_rate)
 
-    pillar_net.compile(optimizer, loss=loss.losses())
-
+    #pillar_net.compile(optimizer, loss=loss.losses())
+    pillar_net.summary()
     data_reader = KittiDataReader()
 
     lidar_files = sorted(glob(os.path.join(DATA_ROOT, "velodyne", "*.bin")))
@@ -41,7 +42,12 @@ if __name__ == "__main__":
     
     training_gen = SimpleDataGenerator(data_reader, params.batch_size, lidar_files[:-validation_len], label_files[:-validation_len], calibration_files[:-validation_len])
     validation_gen = SimpleDataGenerator(data_reader, params.batch_size, lidar_files[-validation_len:], label_files[-validation_len:], calibration_files[-validation_len:])
-
+ 
+    abc, abc1 = training_gen.__getitem__(13)
+    #print("get item shape ",abc)
+    #print("get item shape 1 ",abc1)
+    
+    '''
     log_dir = MODEL_ROOT
     epoch_to_decay = int(
         np.round(params.iters_to_decay / params.batch_size * int(np.ceil(float(len(label_files)) / params.batch_size))))
@@ -66,3 +72,4 @@ if __name__ == "__main__":
         model_str = "interrupted_%s.h5" % time.strftime("%Y%m%d-%H%M%S")
         pillar_net.save(os.path.join(log_dir, model_str))
         print("Interrupt. Saving output to %s" % os.path.join(os.getcwd(), log_dir[1:], model_str))
+    '''

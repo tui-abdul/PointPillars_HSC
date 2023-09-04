@@ -5,10 +5,11 @@ import tensorflow as tf
 from tensorflow.python.keras.utils.data_utils import Sequence
 
 from config import Parameters
-from point_pillars import createPillars, createPillarsTarget
+from point_pillars import createPillars, createPillarsTarget, some_thing
 from readers import DataReader, Label3D
 from sklearn.utils import shuffle
 import sys
+import pandas as pd
 
 
 def select_best_anchors(arr):
@@ -44,7 +45,7 @@ class DataProcessor(Parameters):
         return labels
 
     def make_point_pillars(self, points: np.ndarray):
-
+        #print('points.shape',points.shape)
         assert points.ndim == 2
         assert points.shape[1] == 4
         assert points.dtype == np.float32
@@ -61,6 +62,10 @@ class DataProcessor(Parameters):
                                          self.z_min,
                                          self.z_max,
                                          False)
+        #print('pillar pillar',pillars.shape)
+        #print('indicies', indices)
+        #x = some_thing(20)
+        #print('function test', x)
 
         return pillars, indices
 
@@ -109,7 +114,12 @@ class DataProcessor(Parameters):
                                                False)
         self.pos_cnt += pos
         self.neg_cnt += neg
-
+        print('target shape',target.shape)
+        #print('target',target)
+        print('pos',pos)
+        print('neg',neg)
+        print("nb_classes",self.nb_classes)
+        print("anchor_dims",self.anchor_dims.shape)
         # return a merged target view for all objects in the ground truth and get categorical labels
         sel = select_best_anchors(target)
         ohe = tf.keras.utils.to_categorical(sel[..., 9], num_classes=self.nb_classes, dtype='float64')
@@ -152,10 +162,11 @@ class SimpleDataGenerator(DataProcessor, Sequence):
         classification = []
 
         for i in file_ids:
+            print("fine no ",i, self.lidar_files[i])
             lidar = self.data_reader.read_lidar(self.lidar_files[i])
             # For each file, dividing the space into a x-y grid to create pillars
             # Voxels are the pillar ids
-            pillars_, voxels_ = self.make_point_pillars(lidar)
+            pillars_, voxels_ = self.make_point_pillars(lidar) # input
 
             pillars.append(pillars_)
             voxels.append(voxels_)
@@ -168,9 +179,9 @@ class SimpleDataGenerator(DataProcessor, Sequence):
                 label_transformed = self.transform_labels_into_lidar_coordinates(label, R, t)
                 # These definitions can be found in point_pillars.cpp file
                 # We are splitting a 10 dim vector that contains this information.
-                occupancy_, position_, size_, angle_, heading_, classification_ = self.make_ground_truth(
+                occupancy_, position_, size_, angle_, heading_, classification_ = self.make_ground_truth(    #output
                     label_transformed)
-
+                #print("occupancy, position, size, angle, heading, classification",  np.array(occupancy_).shape, np.array(position_).shape, np.array(size_).shape, np.array(angle_).shape, np.array(heading_).shape, np.array(classification_).shape)
                 occupancy.append(occupancy_)
                 position.append(position_)
                 size.append(size_)
@@ -180,7 +191,6 @@ class SimpleDataGenerator(DataProcessor, Sequence):
 
         pillars = np.concatenate(pillars, axis=0)
         voxels = np.concatenate(voxels, axis=0)
-
         if self.label_files is not None:
             occupancy = np.array(occupancy)
             position = np.array(position)
@@ -188,6 +198,12 @@ class SimpleDataGenerator(DataProcessor, Sequence):
             angle = np.array(angle)
             heading = np.array(heading)
             classification = np.array(classification)
+            print("pillars, voxels, occupancy.shape, position.shape, size.shape, angle.shape, heading.shape, classification.shape",pillars.shape, voxels.shape,occupancy.shape, position.shape, size.shape, angle.shape, heading.shape, classification.shape)
+            #df = pd.DataFrame (position[0,:,:,:,:])
+            #filepath = 'my_excel_file.xlsx'
+            #df.to_excel(filepath, index=False)
+
+            #print("position",position[0,:,:,:,:])
             return [pillars, voxels], [occupancy, position, size, angle, heading, classification]
         else:
             return [pillars, voxels]

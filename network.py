@@ -31,10 +31,12 @@ def build_point_pillar_graph(params: Parameters):
         return tensor + tf.constant(array, dtype=tf.int32)
 
     if batch_size > 1:
-            corrected_indices = tf.keras.layers.Lambda(lambda t: correct_batch_indices(t, batch_size))(input_indices)
+        corrected_indices = tf.keras.layers.Lambda(lambda t: correct_batch_indices(t, batch_size))(input_indices)
+        #print("Batch size > 1",corrected_indices)
+        print("corrected indices",tf.keras.backend.int_shape(corrected_indices))
     else:
         corrected_indices = input_indices
-
+    
     # pillars
     x = tf.keras.layers.Conv2D(nb_channels, (1, 1), activation='linear', use_bias=False, name="pillars/conv2d")(input_pillars)
     x = tf.keras.layers.BatchNormalization(name="pillars/batchnorm", fused=True, epsilon=1e-3, momentum=0.99)(x)
@@ -45,8 +47,9 @@ def build_point_pillar_graph(params: Parameters):
         reshape_shape = (nb_channels, max_pillars)
     else:
         reshape_shape = (max_pillars, nb_channels)
-
+    print("x shape",tf.keras.backend.int_shape(x))
     x = tf.keras.layers.Reshape(reshape_shape, name="pillars/reshape")(x)
+    print("x1 shape",tf.keras.backend.int_shape(x))
     pillars = tf.keras.layers.Lambda(lambda inp: tf.scatter_nd(inp[0], inp[1],
                                                                (batch_size,) + image_size + (nb_channels,)),
                                      name="pillars/scatter_nd")([corrected_indices, x])
